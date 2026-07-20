@@ -1,0 +1,31 @@
+backend/venv/
+backend/.env
+frontent/fvenv
+
+
+__pycache__/
+*.pyc
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+fvenv/
+
+# Environment variables
+.env
+
+# SQLite databases
+*.db
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
