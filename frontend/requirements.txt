@@ -1,9 +1,0 @@
-streamlit
-langchain
-dotenv
-langchain-openai
-langchain-core
-langchain-community
-fastapi
-uvicorn
-pydantic
