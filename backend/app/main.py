@@ -25,7 +25,6 @@ from backend.app.routes.auth import router as auth_router
 from backend.app.routes.chat_routes import router as chat_router
 
 
-
 app = FastAPI(title="Personal AI Assistant")
 
 # Register your modular routing blueprints
@@ -33,6 +32,8 @@ app.include_router(task_router)
 app.include_router(note_router)
 app.include_router(auth_router)
 app.include_router(chat_router)
+
+
 
 @app.on_event("startup")
 def startup_event():

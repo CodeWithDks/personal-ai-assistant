@@ -1,4 +1,4 @@
-# backend/app/api/routes/chat_routes.py
+# backend/app/routes/chat_routes.py
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from backend.app.database.models import User
 from backend.app.api.deps import get_current_user
 from backend.app.ai.agent import build_assistant
+from backend.app.ai.memory import get_thread_config
 
 router = APIRouter(
     prefix="/chat",
@@ -30,9 +31,13 @@ def chat(
         raise HTTPException(status_code=400, detail="Message cannot be empty.")
 
     assistant = build_assistant(user_id=current_user.id)
+    thread_config = get_thread_config(current_user.id)
 
     try:
-        result = assistant.invoke({"messages": [("user", request.message)]})
+        result = assistant.invoke(
+            {"messages": [("user", request.message)]},
+            config=thread_config,
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Assistant failed to respond: {str(e)}")
 
