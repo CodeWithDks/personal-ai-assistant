@@ -17,7 +17,7 @@ load_dotenv(dotenv_path=env_path)
 
 
 from fastapi import FastAPI
-from backend.app.database.database import engine
+from backend.app.database.database import engine, reset_db_development_only
 from backend.app.database import models  # Holds your actual database tables
 from backend.app.routes.task_routes import router as task_router
 from backend.app.routes.note_routes import router as note_router

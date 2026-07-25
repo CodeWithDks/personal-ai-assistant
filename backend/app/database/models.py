@@ -25,6 +25,7 @@ class Task(Base):  # noqa: F821
     status = Column(String, default="pending")
     due_date = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    priority = Column(String, default="medium")
  
     # NEW — links each task to its owner
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)

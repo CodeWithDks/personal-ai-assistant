@@ -6,6 +6,11 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict
 
 
+class TaskPriority(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
 class TaskStatus(str, Enum):
     """Allowed task statuses. Using an enum instead of a raw string prevents
     typos or casing drift (e.g. 'Pending' vs 'pending') from silently
@@ -18,6 +23,7 @@ class TaskStatus(str, Enum):
 class TaskCreate(BaseModel):
     title: str
     description: str | None = None
+    priority: TaskPriority = TaskPriority.MEDIUM
     due_date: datetime | None = None
 
 
@@ -25,6 +31,7 @@ class TaskUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
     status: TaskStatus | None = None
+    priority: TaskPriority | None = None
     due_date: datetime | None = None
 
 
@@ -33,7 +40,9 @@ class TaskResponse(BaseModel):
     title: str
     description: str | None
     status: str
+    priority: str
     due_date: datetime | None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
