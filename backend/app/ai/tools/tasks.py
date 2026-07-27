@@ -20,6 +20,7 @@ from backend.app.services.task_service import (
     update_task,
     delete_task,
     find_duplicate_task,
+    get_due_soon_tasks,
 )
 from backend.app.database.database import SessionLocal
 
@@ -272,7 +273,9 @@ def build_task_tools(user_id: int) -> list:
     ):
         """
         Update the current user's task — title, description, due_date,
-        status, or any combination. Only provided fields are changed.
+        status, priority, or any combination. Only fields you explicitly
+        provide are changed; leaving a parameter unset preserves its
+        existing value.
 
         Requires task_id. If the user referred to the task by name only,
         call search_tasks_tool or get_tasks_tool first to find the matching
@@ -284,41 +287,76 @@ def build_task_tools(user_id: int) -> list:
         thing about X" — that's a completion signal, call this with
         status="completed" on the matching task.
 
+        priority: "low", "medium", or "high".
+
         due_date: ISO 8601 timestamp (e.g. "2026-07-21T21:00:00"), resolved
             relative to the current date/time in your system instructions.
         """
 
-        parsed_due_date, error = _parse_due_date(due_date)
-        if error:
-            return error
-
-        with _db_session() as db:
+        parsed_due_date = None
+        if due_date:
             try:
-                task_data = TaskUpdate(
-                    title=title,
-                    description=description,
-                    due_date=parsed_due_date,
-                    status=status,
-                    priority=priority,
-                )
-                updated_task = update_task(db, task_id, task_data, user_id=user_id)
-
-                return {
-                    "success": True,
-                    "message": "Task updated successfully.",
-                    "data": _serialize_task(updated_task),
-                }
-
-            except HTTPException as e:
-                return {"success": False, "message": e.detail, "data": None}
-
-            except Exception as e:
-                logger.exception("Failed to update task_id=%s for user_id=%s", task_id, user_id)
+                parsed_due_date = datetime.fromisoformat(due_date)
+            except ValueError:
                 return {
                     "success": False,
-                    "message": f"Could not update task: {str(e)}",
+                    "message": f"Could not understand due_date '{due_date}'. Use ISO 8601 format.",
                     "data": None,
                 }
+
+        # Build the update payload with ONLY the fields actually provided.
+        # Passing e.g. title=None explicitly into TaskUpdate(...) would make
+        # Pydantic treat title as "set" (to None) — exclude_unset=True in the
+        # service layer would then wipe title in the database, since the
+        # Task.title column is nullable=False. Only include keys that were
+        # genuinely given a value here.
+        update_fields = {}
+        if title is not None:
+            update_fields["title"] = title
+        if description is not None:
+            update_fields["description"] = description
+        if parsed_due_date is not None:
+            update_fields["due_date"] = parsed_due_date
+        if status is not None:
+            update_fields["status"] = status
+        if priority is not None:
+            update_fields["priority"] = priority
+
+        if not update_fields:
+            return {
+                "success": False,
+                "message": "No fields provided to update.",
+                "data": None,
+            }
+
+        db = SessionLocal()
+
+        try:
+            task_data = TaskUpdate(**update_fields)
+            updated_task = update_task(db, task_id, task_data, user_id=user_id)
+
+            return {
+                "success": True,
+                "message": "Task updated successfully.",
+                "data": {
+                    "id": updated_task.id,
+                    "title": updated_task.title,
+                    "description": updated_task.description,
+                    "status": updated_task.status,
+                    "priority": updated_task.priority,
+                    "due_date": str(updated_task.due_date) if updated_task.due_date else None,
+                },
+            }
+
+        except HTTPException as e:
+            return {"success": False, "message": e.detail, "data": None}
+
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Could not update task: {str(e)}",
+                "data": None,
+            }
 
     @tool
     def delete_task_tool(task_id: int):
@@ -347,10 +385,58 @@ def build_task_tools(user_id: int) -> list:
                     "data": None,
                 }
 
+    @tool
+    def get_daily_briefing_tool():
+        """
+        Get the current user's tasks due within the next 24 hours or already
+        overdue, sorted soonest-first. Use this when the user asks things like
+        "what's on my plate today", "what do I have due", "give me my daily
+        briefing", or "what should I focus on".
+
+        Do not modify any tasks.
+        """
+
+        db = SessionLocal()
+
+        try:
+            due_soon = get_due_soon_tasks(db, user_id=user_id, within_hours=24)
+
+            if not due_soon:
+                return {
+                    "success": True,
+                    "message": "Nothing due in the next 24 hours.",
+                    "data": [],
+                }
+
+            return {
+                "success": True,
+                "message": f"{len(due_soon)} task(s) due soon or overdue.",
+                "data": [
+                    {
+                        "id": t.id,
+                        "title": t.title,
+                        "priority": t.priority,
+                        "due_date": str(t.due_date),
+                    }
+                    for t in due_soon
+                ],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Could not fetch briefing: {str(e)}",
+                "data": None,
+            }
+
+        finally:
+            db.close()
+
     return [
         create_task_tool,
         get_tasks_tool,
         search_tasks_tool,
         update_task_tool,
         delete_task_tool,
+        get_daily_briefing_tool,
     ]

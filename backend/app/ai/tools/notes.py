@@ -177,7 +177,8 @@ def build_note_tools(user_id: int) -> list:
     ):
         """
         Update the current user's note — title, content, or both. Only
-        provided fields are changed.
+        fields you explicitly provide are changed; leaving a parameter
+        unset preserves its existing value.
 
         Requires note_id. If the user referred to the note by title/content
         only, call search_notes_tool first to find the matching note_id.
@@ -185,10 +186,23 @@ def build_note_tools(user_id: int) -> list:
         this tool.
         """
 
+        update_fields = {}
+        if title is not None:
+            update_fields["title"] = title
+        if content is not None:
+            update_fields["content"] = content
+
+        if not update_fields:
+            return {
+                "success": False,
+                "message": "No fields provided to update.",
+                "data": None,
+            }
+
         db = SessionLocal()
 
         try:
-            note_data = NoteUpdate(title=title, content=content)
+            note_data = NoteUpdate(**update_fields)
             updated_note = update_note(db, note_id, note_data, user_id=user_id)
 
             return {

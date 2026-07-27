@@ -7,6 +7,29 @@ from fastapi import HTTPException
 
 from backend.app.database.models import Task
 from backend.app.schemas.task_schema import TaskCreate, TaskUpdate, TaskStatus, TaskPriority
+from datetime import datetime, timezone
+from datetime import datetime, timedelta, UTC
+
+
+
+def get_due_soon_tasks(db: Session, user_id: int, within_hours: int = 24) -> list[Task]:
+    """Return pending tasks due within the next `within_hours` hours, or
+    already overdue, sorted soonest-first. Powers the daily briefing tool
+    and, later, real push reminders."""
+
+    cutoff = datetime.now(UTC).replace(tzinfo=None) + timedelta(hours=within_hours)
+
+    return (
+        db.query(Task)
+        .filter(
+            Task.user_id == user_id,
+            func.lower(Task.status) == "pending",
+            Task.due_date.isnot(None),
+            Task.due_date <= cutoff,
+        )
+        .order_by(Task.due_date.asc())
+        .all()
+    )
 
 
 def find_duplicate_task(db: Session, user_id: int, title: str) -> Task | None:
@@ -127,30 +150,32 @@ def search_tasks(
 
 
 def update_task(db: Session, task_id: int, task: TaskUpdate, user_id: int) -> Task:
-    """Update a task, but only if it belongs to user_id."""
+    """Update a task, but only if it belongs to user_id. Raises 404 if the
+    task doesn't exist OR belongs to someone else — deliberately the same
+    error either way, so we don't leak which task IDs exist for other users."""
 
-    db_task = _get_task_or_404(db, task_id, user_id)
+    db_task = get_task_by_id(db, task_id, user_id)
+
+    if db_task is None:
+        raise HTTPException(status_code=404, detail=f"Task with id {task_id} not found.")
 
     update_data = task.model_dump(exclude_unset=True)
 
-    if update_data.get("status") is not None:
+    # status and priority arrive as enum members (TaskStatus/TaskPriority);
+    # store their plain string value to match the model's String columns
+    if "status" in update_data and update_data["status"] is not None:
         update_data["status"] = update_data["status"].value
 
-    if update_data.get("priority") is not None:
+    if "priority" in update_data and update_data["priority"] is not None:
         update_data["priority"] = update_data["priority"].value
 
     for key, value in update_data.items():
         setattr(db_task, key, value)
 
-    try:
-        db.commit()
-        db.refresh(db_task)
-    except SQLAlchemyError:
-        db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to update task.")
+    db.commit()
+    db.refresh(db_task)
 
     return db_task
-
 
 def delete_task(db: Session, task_id: int, user_id: int) -> dict:
     """Delete a task, but only if it belongs to user_id."""
