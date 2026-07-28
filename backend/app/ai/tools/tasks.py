@@ -68,6 +68,21 @@ def _serialize_task(t) -> dict:
     }
 
 
+def _parse_due_date(due_date_str: str) -> datetime:
+    """Parse an ISO 8601 due_date string from the LLM into a naive
+    datetime, normalizing to local time if a timezone offset was
+    included. This keeps every stored due_date consistent (naive,
+    local) so comparisons in get_due_soon_tasks are always apples-to-
+    apples. Raises ValueError on unparseable input — callers already
+    catch that."""
+
+    parsed = datetime.fromisoformat(due_date_str)
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone().replace(tzinfo=None)
+    return parsed
+
+
+
 def build_task_tools(user_id: int) -> list:
     """Build the set of task tools scoped to a single user. Call this once
     per chat session/request with the authenticated user's id, and pass
@@ -136,9 +151,16 @@ def build_task_tools(user_id: int) -> list:
                 "data": None,
             }
 
-        parsed_due_date, error = _parse_due_date(due_date)
-        if error:
-            return error
+        parsed_due_date = None
+        if due_date:
+            try:
+                parsed_due_date = _parse_due_date(due_date)
+            except ValueError:
+                return {
+                    "success": False,
+                    "message": f"Could not understand due_date '{due_date}'. Use ISO 8601 format.",
+                    "data": None,
+                }
 
         with _db_session() as db:
             try:
@@ -296,7 +318,7 @@ def build_task_tools(user_id: int) -> list:
         parsed_due_date = None
         if due_date:
             try:
-                parsed_due_date = datetime.fromisoformat(due_date)
+                parsed_due_date = _parse_due_date(due_date)
             except ValueError:
                 return {
                     "success": False,

@@ -396,3 +396,20 @@ def test_note_tools_are_isolated_between_users(client, auth_headers, second_user
     bob_get_notes_result = bob_tools["get_notes_tool"].invoke({})
     contents = [n["content"] for n in bob_get_notes_result["data"]]
     assert "Alice's secret note" not in contents
+
+
+def test_due_soon_tasks_use_consistent_naive_datetimes(alice_id):
+    """Regression test: cutoff and stored due_date must both be naive,
+    or the comparison silently misbehaves depending on server timezone."""
+
+    tools = _tools_by_name(build_task_tools(alice_id))
+    create_task_tool = tools["create_task_tool"]
+    get_daily_briefing_tool = tools["get_daily_briefing_tool"]
+
+    create_task_tool.invoke(
+        {"title": "Due in one hour", "due_date": "2020-01-01T00:00:00"}
+    )
+    result = get_daily_briefing_tool.invoke({})
+
+    assert result["success"] is True
+    assert any(t["title"] == "Due in one hour" for t in result["data"])

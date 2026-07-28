@@ -17,7 +17,7 @@ def get_due_soon_tasks(db: Session, user_id: int, within_hours: int = 24) -> lis
     already overdue, sorted soonest-first. Powers the daily briefing tool
     and, later, real push reminders."""
 
-    cutoff = datetime.now(UTC).replace(tzinfo=None) + timedelta(hours=within_hours)
+    cutoff = datetime.now() + timedelta(hours=within_hours)
 
     return (
         db.query(Task)
