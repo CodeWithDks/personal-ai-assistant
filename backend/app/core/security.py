@@ -1,5 +1,6 @@
 # backend/app/core/security.py
 
+import os
 from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt
@@ -8,7 +9,7 @@ from passlib.context import CryptContext
 # --- Configuration ---
 # Move SECRET_KEY to an environment variable in production — never hardcode it.
 # Generate one with: openssl rand -hex 32
-SECRET_KEY = "CHANGE_ME_LOAD_FROM_ENV"
+SECRET_KEY = os.getenv("SECRET_KEY", "CHANGE_ME_LOAD_FROM_ENV")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 

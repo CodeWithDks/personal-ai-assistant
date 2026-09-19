@@ -32,3 +32,5 @@ Thumbs.db
 frontend/node_modules/
 frontend/.env
 frontend/dist/
+run.txt
+
