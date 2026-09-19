@@ -23,9 +23,11 @@ from backend.app.routes.task_routes import router as task_router
 from backend.app.routes.note_routes import router as note_router
 from backend.app.routes.auth import router as auth_router
 from backend.app.routes.chat_routes import router as chat_router
+from fastapi.middleware.cors import CORSMiddleware
 
 
 app = FastAPI(title="Personal AI Assistant")
+
 
 # Register your modular routing blueprints
 app.include_router(task_router)
@@ -34,6 +36,14 @@ app.include_router(auth_router)
 app.include_router(chat_router)
 
 
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Vite's dev server
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 def startup_event():

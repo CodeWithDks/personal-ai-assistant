@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Color tokens as "R G B" triplets (no rgb() wrapper here — that's
+ * added in tailwind.config.js so opacity modifiers keep working).
+ * Light set on :root, dark set on .dark — toggled on <html> by
+ * ThemeContext. Every component using bg-bg / text-ink / bg-surface /
+ * etc. retheme automatically; nothing else has to change.
+ */
+:root {
+  --color-bg: 247 245 241;
+  --color-surface: 255 255 255;
+  --color-ink: 31 29 26;
+  --color-muted: 138 133 119;
+  --color-border: 227 223 214;
+  --color-subtle: 245 244 240;
+  --color-subtle-hover: 250 249 247;
+
+  --color-signal: 31 111 100;
+  --color-signal-soft: 228 240 238;
+  --color-ember: 193 98 45;
+  --color-ember-soft: 251 235 224;
+  --color-danger: 166 61 61;
+  --color-danger-soft: 247 231 229;
+  --color-success: 63 122 92;
+  --color-success-soft: 231 242 236;
+
+  color-scheme: light;
+}
+
+.dark {
+  --color-bg: 20 20 18;
+  --color-surface: 30 29 26;
+  --color-ink: 237 233 227;
+  --color-muted: 162 155 143;
+  --color-border: 54 51 46;
+  --color-subtle: 38 36 33;
+  --color-subtle-hover: 46 44 40;
+
+  --color-signal: 66 176 160;
+  --color-signal-soft: 24 47 43;
+  --color-ember: 224 144 93;
+  --color-ember-soft: 58 40 27;
+  --color-danger: 214 108 108;
+  --color-danger-soft: 58 30 30;
+  --color-success: 108 191 152;
+  --color-success-soft: 26 46 36;
+
+  color-scheme: dark;
+}
+
+body {
+  font-family: 'IBM Plex Sans', sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+::selection {
+  background-color: rgb(var(--color-signal-soft));
+  color: rgb(var(--color-signal));
+}
+
+/* Theme every native form control in one place instead of adding
+   bg-surface/text-ink to each individual input across the app —
+   without this, inputs would keep the browser's default white
+   background in dark mode. Component classes (e.g. border-border)
+   still apply on top since utilities are layered after base. */
+@layer base {
+  input,
+  select,
+  textarea {
+    background-color: rgb(var(--color-surface));
+    color: rgb(var(--color-ink));
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: rgb(var(--color-muted));
+  }
+}
