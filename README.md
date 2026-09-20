@@ -1,282 +1,225 @@
-# 🤖 Personal AI Assistant
+# 🧠 Personal AI Assistant
 
-An AI-powered personal productivity assistant that helps you manage your daily tasks and notes using natural language. Built with **LangChain**, **OpenAI**, **FastAPI**, **Streamlit**, and **SQLite**, this project demonstrates how Large Language Models (LLMs) can interact with real-world tools and databases to automate personal productivity.
-
-> 🚧 **Project Status:** Under Active Development
-
----
-
-# ✨ Features
-
-* 💬 Chat with an AI assistant using natural language
-* ✅ Create, update, delete, and view tasks
-* 📝 Create, update, delete, and retrieve notes
-* 🧠 Tool-calling AI agent powered by LangChain
-* ⚡ FastAPI backend for APIs and business logic
-* 🎨 Streamlit frontend for an interactive user interface
-* 🗄️ SQLite database for persistent storage
-* 🔄 Modular project architecture for easy scalability
+A full-stack, LangChain/LangGraph-powered personal assistant — manage
+tasks and notes through natural-language chat, with a tool-calling agent
+that decides which action to take, persistent per-user conversation
+memory, JWT authentication, and voice input/output. Backend in FastAPI,
+frontend in React.
 
 ---
 
-# 🛠️ Tech Stack
+## ✨ Features
 
-| Technology | Purpose              |
-| ---------- | -------------------- |
-| Python     | Programming Language |
-| LangChain  | AI Agent Framework   |
-| OpenAI GPT | Large Language Model |
-| FastAPI    | Backend API          |
-| Streamlit  | Frontend UI          |
-| SQLAlchemy | ORM                  |
-| SQLite     | Database             |
-| Pydantic   | Data Validation      |
-| Uvicorn    | ASGI Server          |
+- 🤖 **Conversational AI agent** — a LangChain `create_agent` tool-calling
+  agent that manages tasks and notes through plain-language chat
+  (`backend/app/ai/agent.py`)
+- 💾 **Persistent conversation memory** — a LangGraph `SqliteSaver`
+  checkpointer, thread-scoped per user, so the assistant remembers
+  context across messages and sessions (`backend/app/ai/memory.py`)
+- 🔐 **JWT authentication** — signup/login with bcrypt password hashing
+  and signed tokens (`backend/app/core/security.py`, `routes/auth.py`)
+- ✅ **Task management** — full CRUD, exposed to the agent as tools
+  (`ai/tools/tasks.py`) and as a normal REST API (`routes/task_routes.py`)
+- 📝 **Note management** — same pattern: agent tools + REST API
+  (`ai/tools/notes.py`, `routes/note_routes.py`)
+- 🎙️ **Voice input/output** — speech-to-text (Whisper) and
+  text-to-speech (OpenAI TTS), so the assistant can be talked to, not
+  just typed to (`backend/app/ai/voice.py`)
+- 🗄️ **Real database migrations** — Alembic, not just `create_all()`
+  (`backend/alembic/`)
+- 🧪 **Test suite** — pytest, covering auth, chat, notes, tasks, and the
+  AI tools layer (`tests/`)
+- 💻 **React frontend** — TypeScript, Vite, Tailwind (`frontend/`)
 
 ---
 
-# 📁 Project Structure
+## 🏗 Architecture
 
-```text
+```
+User (chat, voice, or direct task/note actions)
+        │
+        ▼
+  React frontend (Vite + TypeScript + Tailwind)
+        │  REST API calls
+        ▼
+  FastAPI backend
+        │
+        ├── routes/          auth, chat, tasks, notes — HTTP layer
+        ├── services/        business logic (auth_service, task_service, note_service)
+        ├── ai/
+        │     ├── agent.py       builds a per-user LangChain agent
+        │     ├── llm.py         the underlying chat model
+        │     ├── memory.py      LangGraph SqliteSaver — per-user thread memory
+        │     ├── prompts.py     system prompt construction
+        │     ├── voice.py       Whisper (speech-to-text) + OpenAI TTS
+        │     └── tools/         tasks.py, notes.py — the tools the agent can call
+        ├── database/         SQLAlchemy models + engine (models.py, database.py)
+        ├── core/             security (JWT, password hashing)
+        └── schemas/          Pydantic request/response models
+        │
+        ▼
+  SQLite (assistant.db — tasks/notes/users, via SQLAlchemy + Alembic)
+  SQLite (chat_memory.db — conversation checkpoints, via LangGraph SqliteSaver)
+```
+
+Two separate SQLite databases by design: `assistant.db` holds structured
+application data (users, tasks, notes) through SQLAlchemy, while
+`chat_memory.db` holds LangGraph's own conversation checkpoints — keeping
+the agent's memory format independent of the application's own schema.
+
+---
+
+## 📂 Project Structure
+
+```
 personal-ai-assistant/
-│
 ├── backend/
 │   ├── app/
-│   │   ├── ai/
-│   │   │   ├── agent.py
-│   │   │   ├── llm.py
-│   │   │   ├── prompts.py
-│   │   │   └── tools/
-│   │   │       ├── notes.py
-│   │   │       └── tasks.py
-│   │   │
-│   │   ├── database/
-│   │   ├── models/
-│   │   ├── routes/
-│   │   ├── schemas/
-│   │   ├── services/
-│   │   └── main.py
-│   │
-│   └── requirements.txt
+│   │   ├── ai/                  Agent, memory, voice, tools, prompts
+│   │   ├── api/                 Shared dependencies (deps.py)
+│   │   ├── core/                Security (JWT, hashing)
+│   │   ├── database/            SQLAlchemy models + engine
+│   │   ├── routes/               auth, chat, tasks, notes
+│   │   ├── schemas/               Pydantic models
+│   │   ├── services/              Business logic
+│   │   └── main.py                 FastAPI app entry point
+│   ├── alembic/                  Database migrations
+│   ├── alembic.ini
+│   ├── requirements.txt
+│   └── .env                       (not committed — see Setup)
 │
 ├── frontend/
-│   ├── ui.py
-│   └── requirements.txt
+│   ├── src/
+│   │   ├── api/                  API client calls to the backend
+│   │   ├── components/            auth, chat, tasks, notes, layout, shared
+│   │   ├── context/                 React context providers
+│   │   ├── hooks/                    Custom hooks
+│   │   ├── pages/                     Route-level pages
+│   │   ├── types/                      TypeScript types
+│   │   └── utils/                       Helpers
+│   ├── package.json
+│   └── .env.example
 │
-├── .env
-├── .gitignore
-├── README.md
-└── LICENSE
+├── tests/                       pytest — auth, chat, tasks, notes, AI tools
+├── pytest.ini
+└── README.md
 ```
 
 ---
 
-# 🚀 Getting Started
+## ⚙ Setup
 
-## 1. Clone the Repository
-
-```bash
-git clone https://github.com/your-username/personal-ai-assistant.git
-
-cd personal-ai-assistant
-```
-
----
-
-## 2. Create a Virtual Environment
-
-```bash
-python -m venv .venv
-```
-
-Activate it:
-
-### Windows
-
-```bash
-.venv\Scripts\activate
-```
-
-### Linux / macOS
-
-```bash
-source .venv/bin/activate
-```
-
----
-
-## 3. Install Dependencies
-
-Backend:
+### 1. Backend
 
 ```bash
 cd backend
-
-pip install -r requirements.txt
+python -m venv venv
 ```
 
-Frontend:
+**Windows**
+```bash
+venv\Scripts\activate
+```
+**Linux / macOS**
+```bash
+source venv/bin/activate
+```
 
 ```bash
-cd ../frontend
-
 pip install -r requirements.txt
 ```
 
----
-
-## 4. Configure Environment Variables
-
-Create a `.env` file in the project root.
+Create a `.env` file **inside `backend/`** (not the project root — the
+app loads it from this exact path):
 
 ```env
-OPENAI_API_KEY=your_openai_api_key
+OPENAI_API_KEY=your_api_key_here
+SECRET_KEY=your_generated_secret_here
 ```
 
----
+Generate a real `SECRET_KEY`:
+```bash
+openssl rand -hex 32
+```
 
-## 5. Start the FastAPI Backend
+Run database migrations:
+```bash
+alembic upgrade head
+```
 
-From the project root:
-
+Start the backend:
 ```bash
 uvicorn backend.app.main:app --reload
 ```
 
-The backend will be available at:
-
-```
-http://localhost:8000
-```
-
-API documentation:
-
-```
-http://localhost:8000/docs
-```
-
----
-
-## 6. Start the Streamlit Frontend
-
-Open a new terminal:
+### 2. Frontend
 
 ```bash
-streamlit run frontend/ui.py
+cd frontend
+npm i
 ```
 
-The application will be available at:
-
+Create `frontend/.env` from the provided example:
+```bash
+cp .env.example .env
 ```
-http://localhost:8501
-```
-
----
-
-# 🧠 AI Capabilities
-
-The assistant can understand natural language requests such as:
-
-* "Create a task to finish my project tomorrow."
-* "Show all my pending tasks."
-* "Delete my shopping note."
-* "Create a note about today's meeting."
-* "Update my math task to 5 PM."
-
-The AI automatically selects the appropriate tool to perform the requested action.
-
----
-
-# 📌 Current Features
-
-### Tasks
-
-* Create tasks
-* View tasks
-* Update tasks
-* Delete tasks
-
-### Notes
-
-* Create notes
-* View notes
-* Update notes
-* Delete notes
-
----
-
-# 🔮 Planned Features
-
-* User authentication
-* Conversation memory
-* Semantic search for notes
-* Task reminders
-* Calendar integration
-* Voice assistant
-* Email integration
-* PDF document understanding
-* RAG (Retrieval-Augmented Generation)
-* Multi-agent workflows
-* Docker support
-* Cloud deployment
-* Unit and integration tests
-
----
-
-# 📷 Screenshots
-
-You can add screenshots here once the UI is complete.
-
-```text
-assets/
-├── home.png
-├── chat.png
-└── tasks.png
-```
-
----
-
-# 🤝 Contributing
-
-Contributions are welcome!
-
-1. Fork the repository
-2. Create a feature branch
 
 ```bash
-git checkout -b feature/new-feature
+npm run dev
 ```
 
-3. Commit your changes
+---
+
+## 🧪 Running Tests
+
+From the project root:
 
 ```bash
-git commit -m "Add new feature"
+pytest
 ```
 
-4. Push to your branch
-
-```bash
-git push origin feature/new-feature
-```
-
-5. Open a Pull Request
+Covers authentication, chat, task and note endpoints, and the agent's
+tool layer (`tests/test_auth_api.py`, `test_chat_api.py`,
+`test_tasks_api.py`, `test_notes_api.py`, `test_ai_tools.py`).
 
 ---
 
-# 📜 License
+## 🛠 Tech Stack
 
-This project is licensed under the MIT License.
+**Backend:** Python, FastAPI, SQLAlchemy, Alembic, SQLite, LangChain,
+LangGraph, OpenAI (chat, Whisper, TTS), python-jose (JWT), passlib
+(bcrypt), pytest
 
----
-
-# 👨‍💻 Author
-
-**Your Name**
-
-GitHub: https://github.com/your-username
-
-LinkedIn: https://linkedin.com/in/your-profile
+**Frontend:** React, TypeScript, Vite, Tailwind CSS
 
 ---
 
-⭐ If you found this project helpful, consider giving it a star on GitHub!
+## 🎯 Status
+
+- [x] Task and note CRUD (API + agent tools)
+- [x] Tool-calling conversational agent
+- [x] Persistent, per-user conversation memory
+- [x] JWT authentication
+- [x] Voice input (speech-to-text) and output (text-to-speech)
+- [x] Database migrations (Alembic)
+- [x] Test suite (pytest)
+- [x] React frontend (replacing an earlier Streamlit UI)
+
+### Planned
+- [ ] Deployment (Docker / hosted)
+- [ ] Streaming agent responses in the UI
+- [ ] Multi-turn voice conversations (not just single utterances)
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](./LICENSE).
+
+---
+
+## 👨‍💻 Author
+
+**Deepak Kumar Singh**
+GitHub: [github.com/CodeWithDks](https://github.com/CodeWithDks)
+LinkedIn: [linkedin.com/in/deepaksinghai](https://linkedin.com/in/deepaksinghai)
