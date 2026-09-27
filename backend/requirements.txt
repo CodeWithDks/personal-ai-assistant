@@ -79,6 +79,7 @@ Pygments==2.20.0
 pytest==9.1.1
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
+psycopg[binary]==3.2.10
 python-jose==3.5.0
 python-multipart==0.0.32
 PyYAML==6.0.3
