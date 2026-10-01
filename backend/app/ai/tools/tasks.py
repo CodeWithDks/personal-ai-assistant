@@ -380,6 +380,8 @@ def build_task_tools(user_id: int) -> list:
                 "data": None,
             }
 
+        finally:
+            db.close()
     @tool
     def delete_task_tool(task_id: int):
         """
