@@ -25,9 +25,18 @@ from backend.app.routes.auth import router as auth_router
 from backend.app.routes.chat_routes import router as chat_router
 from fastapi.middleware.cors import CORSMiddleware
 
+from fastapi import Request
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from backend.app.core.rate_limit import limiter
+
 
 app = FastAPI(title="Personal AI Assistant")
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # Register your modular routing blueprints
 app.include_router(task_router)
