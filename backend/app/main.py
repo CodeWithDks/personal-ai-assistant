@@ -17,19 +17,19 @@ load_dotenv(dotenv_path=env_path)
 
 
 from fastapi import FastAPI
-from backend.app.database.database import engine, reset_db_development_only
-from backend.app.database import models  # Holds your actual database tables
-from backend.app.routes.task_routes import router as task_router
-from backend.app.routes.note_routes import router as note_router
-from backend.app.routes.auth import router as auth_router
-from backend.app.routes.chat_routes import router as chat_router
+from app.database.database import engine, reset_db_development_only
+from app.database import models  # Holds your actual database tables
+from app.routes.task_routes import router as task_router
+from app.routes.note_routes import router as note_router
+from app.routes.auth import router as auth_router
+from app.routes.chat_routes import router as chat_router
 from fastapi.middleware.cors import CORSMiddleware
 
 from fastapi import Request
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from backend.app.core.rate_limit import limiter
+from app.core.rate_limit import limiter
 
 
 app = FastAPI(title="Personal AI Assistant")
