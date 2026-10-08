@@ -8,7 +8,7 @@
 
 import pytest
 
-from backend.app.routes import chat_routes as chat_routes_module
+from app.routes import chat_routes as chat_routes_module
 
 
 class _FakeMessage:
