@@ -1,16 +1,18 @@
 # backend/app/routes/chat_routes.py
 
+import logging
+import base64
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Request
 from pydantic import BaseModel, Field
-from backend.app.core.rate_limit import limiter
 
+from backend.app.core.rate_limit import limiter
 from backend.app.database.models import User
 from backend.app.api.deps import get_current_user
 from backend.app.ai.agent import build_assistant
 from backend.app.ai.memory import get_thread_config
-import base64
-
 from backend.app.ai.voice import transcribe_audio, synthesize_speech
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/chat",
@@ -51,8 +53,12 @@ def chat(
             {"messages": [("user", body.message)]},
             config=thread_config,
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Assistant failed to respond: {str(e)}")
+    except Exception:
+        logger.exception("Chat failed for user_id=%s", current_user.id)
+        raise HTTPException(
+            status_code=500,
+            detail="The assistant couldn't respond right now. Please try again."
+        )
 
     reply_text = result["messages"][-1].content
     return ChatResponse(reply=reply_text)
@@ -72,8 +78,12 @@ async def voice_chat(
 
     try:
         transcript = transcribe_audio(audio_bytes, filename=audio.filename or "audio.wav")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Could not transcribe audio: {str(e)}")
+    except Exception:
+        logger.exception("Transcription failed for user_id=%s", current_user.id)
+        raise HTTPException(
+            status_code=500,
+            detail="Could not transcribe audio."
+        )
 
     if not transcript.strip():
         raise HTTPException(
@@ -88,15 +98,23 @@ async def voice_chat(
             {"messages": [("user", transcript)]},
             config=thread_config,
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Assistant failed to respond: {str(e)}")
+    except Exception:
+        logger.exception("Chat via voice failed for user_id=%s", current_user.id)
+        raise HTTPException(
+            status_code=500,
+            detail="The assistant couldn't respond right now. Please try again."
+        )
 
     reply_text = result["messages"][-1].content
 
     try:
         audio_reply_bytes = synthesize_speech(reply_text)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Could not synthesize speech: {str(e)}")
+    except Exception:
+        logger.exception("Speech synthesis failed for user_id=%s", current_user.id)
+        raise HTTPException(
+            status_code=500,
+            detail="Could not synthesize speech."
+        )
 
     return VoiceChatResponse(
         transcript=transcript,
