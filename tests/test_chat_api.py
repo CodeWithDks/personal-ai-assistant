@@ -6,9 +6,11 @@
 # the agent's reasoning. For real end-to-end agent behavior, see
 # test_chat_integration.py (marked @pytest.mark.integration).
 
+# pyrefly: ignore [missing-import]
 import pytest
 
-from app.routes import chat_routes as chat_routes_module
+# pyrefly: ignore [missing-import]
+from backend.app.routes import chat_routes as chat_routes_module
 
 
 class _FakeMessage:
@@ -88,7 +90,7 @@ def test_chat_handles_assistant_failure_gracefully(client, auth_headers, fake_as
 
     response = client.post("/chat/", json={"message": "hello"}, headers=auth_headers)
     assert response.status_code == 500
-    assert "failed to respond" in response.json()["detail"].lower()
+    assert "couldn't respond" in response.json()["detail"].lower()
 
 
 def test_chat_does_not_leak_internal_error_details(client, auth_headers, fake_assistant):

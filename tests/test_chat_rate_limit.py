@@ -1,6 +1,8 @@
 # tests/test_chat_rate_limit.py
 
+# pyrefly: ignore [missing-import]
 import pytest
+# pyrefly: ignore [missing-import]
 from fastapi.testclient import TestClient
 from backend.app.main import app
 from backend.app.core.security import create_access_token
