@@ -45,18 +45,26 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
-# CORS middleware (Must be *below* SlowAPIMiddleware so 429 errors carry CORS headers)
+
+# CORS middleware (Must be below SlowAPIMiddleware so 429 errors carry CORS headers)
+
 cors_origins = [
-    o.strip()
-    for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
-    if o.strip()
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:5173,http://localhost:8080,https://personal-assistant-09.lovable.app"
+    ).split(",")
+    if origin.strip()
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_origin_regex=os.getenv("CORS_ORIGIN_REGEX") or None,
-    allow_credentials=False,  # We use Authorization Bearer tokens, not cookies
+    allow_origin_regex=os.getenv(
+        "CORS_ORIGIN_REGEX",
+        r"https://.*\.(lovable\.app|lovableproject\.com)"
+    ),
+    allow_credentials=False,  # Using Authorization Bearer tokens, not cookies
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
