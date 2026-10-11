@@ -8,10 +8,14 @@ from passlib.context import CryptContext
 
 # --- Configuration ---
 # Move SECRET_KEY to an environment variable in production — never hardcode it.
-# Generate one with: openssl rand -hex 32
+# Generate one with: python -c "import secrets; print(secrets.token_hex(32))"
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY must be set before starting the application")
+
+if len(SECRET_KEY) < 32:
+    raise RuntimeError("SECRET_KEY must be at least 32 characters")
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
