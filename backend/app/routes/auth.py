@@ -1,6 +1,6 @@
-# backend/app/api/routes/auth.py
+# backend/app/routes/auth.py
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
@@ -8,6 +8,7 @@ from backend.app.database.database import get_db
 from backend.app.schemas.user_schema import UserCreate, UserResponse, Token
 from backend.app.services.auth_service import register_user, authenticate_user
 from backend.app.core.security import create_access_token
+from backend.app.core.rate_limit import limiter
 
 router = APIRouter(
     prefix="/auth",
@@ -16,12 +17,14 @@ router = APIRouter(
 
 
 @router.post("/register", response_model=UserResponse)
-def register(user: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def register(request: Request, user: UserCreate, db: Session = Depends(get_db)):
     return register_user(db, user)
 
 
 @router.post("/login", response_model=Token)
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     """
     Uses OAuth2PasswordRequestForm (username + password fields) rather than
     our UserLogin schema, because this is what powers the Swagger UI
