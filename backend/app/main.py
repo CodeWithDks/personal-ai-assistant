@@ -1,4 +1,7 @@
+# backend/app/main.py
+
 import os
+import logging
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -14,29 +17,49 @@ env_path = os.path.join(backend_dir, ".env")
 # Force-load the file directly from this path location
 load_dotenv(dotenv_path=env_path)
 
+# Configure logging so logs show up cleanly in stdout / Render logs
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
+logger = logging.getLogger(__name__)
 
-
-from fastapi import FastAPI
-from app.database.database import engine, reset_db_development_only
-from app.database import models  # Holds your actual database tables
-from app.routes.task_routes import router as task_router
-from app.routes.note_routes import router as note_router
-from app.routes.auth import router as auth_router
-from app.routes.chat_routes import router as chat_router
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-
-from fastapi import Request
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from app.core.rate_limit import limiter
 
+from backend.app.database.database import engine
+from backend.app.database import models  # Holds your actual database tables
+from backend.app.core.rate_limit import limiter
+from backend.app.routes.auth import router as auth_router
+from backend.app.routes.chat_routes import router as chat_router
+from backend.app.routes.note_routes import router as note_router
+from backend.app.routes.task_routes import router as task_router
 
 app = FastAPI(title="Personal AI Assistant")
 
+# Rate limiter setup
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
+
+# CORS middleware (Must be *below* SlowAPIMiddleware so 429 errors carry CORS headers)
+cors_origins = [
+    o.strip()
+    for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+    if o.strip()
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_origin_regex=os.getenv("CORS_ORIGIN_REGEX") or None,
+    allow_credentials=False,  # We use Authorization Bearer tokens, not cookies
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 
 # Register your modular routing blueprints
 app.include_router(task_router)
@@ -45,29 +68,20 @@ app.include_router(auth_router)
 app.include_router(chat_router)
 
 
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        origin.strip()
-        for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
-        if origin.strip()
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
 
 @app.on_event("startup")
 def startup_event():
     """
     Executes tasks safely on system launch.
-    Ensures structural integrity without erasing production data files.
+    Alembic handles migrations in production (Postgres), so create_all 
+    runs only for local SQLite fallback testing.
     """
-    # 1. Safely create any missing database tables (does not alter or erase existing data)
-    models.Base.metadata.create_all(bind=engine)
-    print("Database infrastructure synchronized successfully.")
+    if str(engine.url).startswith("sqlite"):
+        models.Base.metadata.create_all(bind=engine)
+        logger.info("Local SQLite database infrastructure synchronized.")
+    else:
+        logger.info("Connected to remote production database (Alembic manages migrations).")
