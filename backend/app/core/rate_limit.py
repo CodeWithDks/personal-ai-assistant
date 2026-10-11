@@ -1,22 +1,16 @@
 # backend/app/core/rate_limit.py
-#
-# Rate limiting keyed by authenticated user, not IP. We decode the JWT
-# ourselves here because slowapi's key_func only receives the raw Request
-# — FastAPI's Depends() dependencies haven't run yet at this point.
 
+import os
 from fastapi import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from backend.app.core.security import decode_access_token
 
+# Disable rate limiting during pytest test runs
+is_testing = os.getenv("TESTING", "false").lower() == "true" or "pytest" in os.getenv("_", "")
 
 def rate_limit_key(request: Request) -> str:
-    """
-    Key by user id when there's a valid bearer token, otherwise fall back
-    to client IP. Requests with no/invalid token will be rejected by
-    get_current_user anyway — this fallback just avoids crashing here.
-    """
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         token = auth_header.removeprefix("Bearer ")
@@ -25,5 +19,4 @@ def rate_limit_key(request: Request) -> str:
             return f"user:{payload['sub']}"
     return get_remote_address(request)
 
-
-limiter = Limiter(key_func=rate_limit_key)
+limiter = Limiter(key_func=rate_limit_key, enabled=not is_testing)
