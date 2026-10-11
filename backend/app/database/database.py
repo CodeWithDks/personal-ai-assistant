@@ -1,5 +1,6 @@
-import os
+# backend/app/core/database.py
 
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -16,6 +17,13 @@ elif DATABASE_URL.startswith("postgresql://"):
 engine_options = {}
 if DATABASE_URL.startswith("sqlite"):
     engine_options["connect_args"] = {"check_same_thread": False}
+else:
+    engine_options.update(
+        pool_size=5,
+        max_overflow=5,
+        pool_pre_ping=True,   # test a connection before using it
+        pool_recycle=300,     # replace connections idle > 5 min
+    )
 
 # Initialize SQLAlchemy Engine
 engine = create_engine(DATABASE_URL, **engine_options)
@@ -37,13 +45,3 @@ def get_db():
         yield db
     finally:
         db.close()
-
-def reset_db_development_only():
-    """
-    Call this function only during active local testing.
-    Drops existing mismatched tables and builds clean structures.
-    """
-    import logging
-    logging.warning("Resetting development database schemas...")
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
