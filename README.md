@@ -8,6 +8,7 @@ voice input/output.
 - **Live API:** https://personal-ai-assistant-euur.onrender.com
   ([interactive docs](https://personal-ai-assistant-euur.onrender.com/docs) ·
   [health check](https://personal-ai-assistant-euur.onrender.com/health))
+- **Live app:** https://personal-assistant-09.lovable.app
 - **Frontend (Lovable):** https://github.com/CodeWithDks/personal-ai-assistant-web
 
 > The API runs on Render's free tier, which sleeps after ~15 minutes of
