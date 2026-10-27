@@ -3,14 +3,16 @@
 import base64
 import logging
 import os
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Request
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, File, Query, Request, Response, UploadFile
 from pydantic import BaseModel, Field
 
 from backend.app.core.rate_limit import limiter
 from backend.app.database.models import User
 from backend.app.api.deps import get_current_user
 from backend.app.ai.agent import build_assistant
-from backend.app.ai.memory import get_thread_config
+from backend.app.ai.memory import get_checkpointer, get_thread_config
 from backend.app.ai.voice import transcribe_audio, synthesize_speech
 
 logger = logging.getLogger(__name__)
@@ -63,16 +65,41 @@ def _audio_filename(upload: UploadFile) -> str:
     return f"recording.{extension}"
 
 
-def _extract_reply(result: dict) -> str:
-    """Always return a non-empty plain string from the agent's final message."""
-    content = result["messages"][-1].content
+def _content_to_text(content) -> str:
+    """Flatten a message's content (a string, or a list of content blocks)
+    into plain text."""
     if isinstance(content, list):  # some models return content blocks
         content = "".join(
             part.get("text", "") if isinstance(part, dict) else str(part)
             for part in content
         )
-    content = (content or "").strip()
-    return content or FALLBACK_REPLY
+    return (content or "").strip()
+
+
+def _extract_reply(result: dict) -> str:
+    """Always return a non-empty plain string from the agent's final message."""
+    return _content_to_text(result["messages"][-1].content) or FALLBACK_REPLY
+
+
+def _visible_messages(messages) -> list[dict]:
+    """
+    Keep only what a person would see in the chat: their own messages and the
+    assistant's final text replies. Tool results, tool-call steps, system
+    prompts and empty messages are dropped.
+    """
+    visible = []
+    for message in messages:
+        if message.type == "human":
+            role = "user"
+        elif message.type == "ai" and not getattr(message, "tool_calls", None):
+            role = "assistant"
+        else:
+            continue
+
+        text = _content_to_text(message.content)
+        if text:
+            visible.append({"role": role, "content": text})
+    return visible
 
 
 class ChatRequest(BaseModel):
@@ -81,6 +108,15 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
+
+
+class ChatHistoryMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class ChatHistoryResponse(BaseModel):
+    messages: list[ChatHistoryMessage]
 
 
 class VoiceChatResponse(BaseModel):
@@ -182,3 +218,46 @@ def voice_chat(
         audio_base64=base64.b64encode(audio_reply_bytes).decode("utf-8"),
         audio_format="mp3",
     )
+
+
+@router.get("/history", response_model=ChatHistoryResponse)
+@limiter.limit("30/minute")
+def get_chat_history(
+    request: Request,
+    limit: int = Query(50, ge=1, le=100, description="Number of most recent messages"),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    The current user's conversation, oldest to newest. `limit` counts
+    individual messages (a question and its answer are two messages) and keeps
+    the most recent ones. A user with no conversation gets an empty list.
+    """
+    assistant = build_assistant(user_id=current_user.id)
+
+    try:
+        state = assistant.get_state(get_thread_config(current_user.id))
+    except Exception:
+        logger.exception("Loading chat history failed for user_id=%s", current_user.id)
+        raise HTTPException(status_code=500, detail="Could not load chat history.")
+
+    messages = (state.values or {}).get("messages", [])
+    return ChatHistoryResponse(messages=_visible_messages(messages)[-limit:])
+
+
+@router.delete("/history", status_code=204)
+@limiter.limit("10/minute")
+def clear_chat_history(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    """Erase the assistant's memory of this user's conversation. Idempotent:
+    returns 204 even when there is nothing to delete."""
+    thread_id = get_thread_config(current_user.id)["configurable"]["thread_id"]
+
+    try:
+        get_checkpointer().delete_thread(thread_id)
+    except Exception:
+        logger.exception("Clearing chat history failed for user_id=%s", current_user.id)
+        raise HTTPException(status_code=500, detail="Could not clear chat history.")
+
+    return Response(status_code=204)
